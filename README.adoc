@@ -150,7 +150,7 @@ content-length: 0
 == To reproduce
 
  curl -H "Origin: https://foo.example.com" \
-   -X GET "http://localhost:8080/test/status/201" -I
+   -X GET "http://localhost:8080/test/status/500" -I
 
 .Expected response
 ----
