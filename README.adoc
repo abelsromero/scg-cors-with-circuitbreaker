@@ -1,0 +1,166 @@
+= CORS + CircuitBreaker reproducer
+
+Reproducer to showcase an issue when CORS and CircuitBreaker are combined in SCG.
+
+== Issue description
+
+When calling a route with CORS and CircuitBreaker, and redirecting to the fallback uri, SCG fails with 500 and the following error.
+
+----
+2024-04-11T11:31:08.389+02:00 ERROR 65701 --- [     parallel-1] a.w.r.e.AbstractErrorWebExceptionHandler : [0a193941-1]  500 Server Error for HTTP GET "/test/status/500"
+
+java.lang.IllegalArgumentException: Actual request scheme must not be null
+	at org.springframework.util.Assert.notNull(Assert.java:172) ~[spring-core-6.1.5.jar:6.1.5]
+	Suppressed: reactor.core.publisher.FluxOnAssembly$OnAssemblyException:
+Error has been observed at the following site(s):
+	*__checkpoint ⇢ org.springframework.cloud.gateway.filter.WeightCalculatorWebFilter [DefaultWebFilterChain]
+	*__checkpoint ⇢ HTTP GET "/test/status/500" [ExceptionHandlingWebHandler]
+Original Stack Trace:
+		at org.springframework.util.Assert.notNull(Assert.java:172) ~[spring-core-6.1.5.jar:6.1.5]
+		at org.springframework.web.cors.reactive.CorsUtils.isSameOrigin(CorsUtils.java:81) ~[spring-web-6.1.5.jar:6.1.5]
+		at org.springframework.web.cors.reactive.CorsUtils.isCorsRequest(CorsUtils.java:44) ~[spring-web-6.1.5.jar:6.1.5]
+		at org.springframework.web.cors.reactive.DefaultCorsProcessor.process(DefaultCorsProcessor.java:86) ~[spring-web-6.1.5.jar:6.1.5]
+		at org.springframework.web.reactive.handler.AbstractHandlerMapping.lambda$getHandler$1(AbstractHandlerMapping.java:201) ~[spring-webflux-6.1.5.jar:6.1.5]
+		at reactor.core.publisher.FluxMap$MapSubscriber.onNext(FluxMap.java:106) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxSwitchIfEmpty$SwitchIfEmptySubscriber.onNext(FluxSwitchIfEmpty.java:74) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxMap$MapSubscriber.onNext(FluxMap.java:122) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxMap$MapSubscriber.onNext(FluxMap.java:122) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoNext$NextSubscriber.onNext(MonoNext.java:82) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.innerNext(FluxConcatMapNoPrefetch.java:259) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMap$ConcatMapInner.onNext(FluxConcatMap.java:865) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onNext(FluxOnErrorResume.java:79) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.onNext(MonoPeekTerminal.java:180) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoFilterWhen$MonoFilterWhenMain.onNext(MonoFilterWhen.java:136) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$ScalarSubscription.request(Operators.java:2571) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoFilterWhen$MonoFilterWhenMain.request(MonoFilterWhen.java:183) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.request(MonoPeekTerminal.java:139) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.set(Operators.java:2367) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onSubscribe(FluxOnErrorResume.java:74) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.onSubscribe(MonoPeekTerminal.java:152) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoFilterWhen$MonoFilterWhenMain.onSubscribe(MonoFilterWhen.java:100) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoJust.subscribe(MonoJust.java:55) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Mono.subscribe(Mono.java:4568) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.onNext(FluxConcatMapNoPrefetch.java:207) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxDematerialize$DematerializeSubscriber.onNext(FluxDematerialize.java:98) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxDematerialize$DematerializeSubscriber.onNext(FluxDematerialize.java:44) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxIterable$IterableSubscription.slowPath(FluxIterable.java:335) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxIterable$IterableSubscription.request(FluxIterable.java:294) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxDematerialize$DematerializeSubscriber.request(FluxDematerialize.java:127) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.innerComplete(FluxConcatMapNoPrefetch.java:275) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMap$ConcatMapInner.onComplete(FluxConcatMap.java:889) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.onComplete(Operators.java:2231) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.onComplete(MonoPeekTerminal.java:299) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoFilterWhen$MonoFilterWhenMain.onNext(MonoFilterWhen.java:141) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$ScalarSubscription.request(Operators.java:2571) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoFilterWhen$MonoFilterWhenMain.request(MonoFilterWhen.java:183) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.request(MonoPeekTerminal.java:139) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.request(Operators.java:2331) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.request(Operators.java:2331) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.request(FluxConcatMapNoPrefetch.java:339) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoNext$NextSubscriber.request(MonoNext.java:108) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxMap$MapSubscriber.request(FluxMap.java:164) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxMap$MapSubscriber.request(FluxMap.java:164) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.request(Operators.java:2331) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxMap$MapSubscriber.request(FluxMap.java:164) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.request(Operators.java:2331) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.request(FluxConcatMapNoPrefetch.java:339) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoNext$NextSubscriber.request(MonoNext.java:108) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.set(Operators.java:2367) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Operators$MultiSubscriptionSubscriber.onSubscribe(Operators.java:2241) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoNext$NextSubscriber.onSubscribe(MonoNext.java:70) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxConcatMapNoPrefetch$FluxConcatMapNoPrefetchSubscriber.onSubscribe(FluxConcatMapNoPrefetch.java:164) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxIterable.subscribe(FluxIterable.java:201) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxIterable.subscribe(FluxIterable.java:83) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.Mono.subscribe(Mono.java:4568) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onError(FluxOnErrorResume.java:103) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoPeekTerminal$MonoTerminalPeekSubscriber.onError(MonoPeekTerminal.java:258) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.SerializedSubscriber.onError(SerializedSubscriber.java:124) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.handleTimeout(FluxTimeout.java:296) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.doTimeout(FluxTimeout.java:281) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxTimeout$TimeoutTimeoutSubscriber.onNext(FluxTimeout.java:420) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.FluxOnErrorReturn$ReturnSubscriber.onNext(FluxOnErrorReturn.java:162) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoDelay$MonoDelayRunnable.propagateDelay(MonoDelay.java:270) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.publisher.MonoDelay$MonoDelayRunnable.run(MonoDelay.java:285) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:68) ~[reactor-core-3.6.4.jar:3.6.4]
+		at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:28) ~[reactor-core-3.6.4.jar:3.6.4]
+		at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264) ~[na:na]
+		at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304) ~[na:na]
+		at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136) ~[na:na]
+		at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635) ~[na:na]
+		at java.base/java.lang.Thread.run(Thread.java:842) ~[na:na]
+----
+
+== Notes
+
+* Issue happens when CORS is configured globally or per route.
+* When debugging `org.springframework.web.cors.reactive.CorsUtils`, the error happens in the second interation, which corresponds to the fallback redirect.
+
+== Testing
+
+To validate service is working:
+
+ curl "http://localhost:8080/test/status/201" -I
+
+.Expected response
+----
+HTTP/1.1 201 Created
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Date: Thu, 11 Apr 2024 09:07:16 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 0
+Server: gunicorn/19.9.0
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Credentials: true
+----
+
+To validate CORS is working:
+
+ curl -H "Origin: https://foo.example.com" \
+   -X GET "http://localhost:8080/test/status/201" -I
+
+.Expected response
+----
+HTTP/1.1 201 Created
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Access-Control-Allow-Origin: https://foo.example.com
+Date: Thu, 11 Apr 2024 09:08:34 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 0
+Server: gunicorn/19.9.0
+Access-Control-Allow-Origin: https://foo.example.com
+Access-Control-Allow-Credentials: true
+----
+
+ curl -H "Origin: https://not.you.com" \
+   -X GET "http://localhost:8080/test/status/201" -I
+
+.Expected response
+----
+HTTP/1.1 403 Forbidden
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+content-length: 0
+----
+
+== To reproduce
+
+ curl -H "Origin: https://foo.example.com" \
+   -X GET "http://localhost:8080/test/status/201" -I
+
+.Expected response
+----
+HTTP/1.1 500 Internal Server Error
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Access-Control-Allow-Origin: https://foo.example.com
+Content-Type: application/json
+Content-Length: 141
+----
+
+See logs for error.

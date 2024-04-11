@@ -1,0 +1,31 @@
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "https://foo.example.com"
+            allowedMethods: [ GET, POST]
+            allowedHeaders: ['*']
+      routes:
+        - id: route
+          uri: https://httpbin.org
+          #          metadata:
+          #            cors:
+          #              allowedOrigins: 'https://foo.example.com'
+          #              allowedMethods: [ GET, POST ]
+          #              allowedHeaders: '*'
+          predicates:
+            - Path=/test/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: fetchIngredients
+                fallbackUri: forward:/fallback
+                statusCodes:
+                  - 500
+        - id: circuit-breaker-fallback
+          uri: https://httpbin.org
+          predicates:
+            - Path=/fallback
